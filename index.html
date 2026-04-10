@@ -232,10 +232,10 @@
 </main>
 
 <script>
-  // ── URL DA SUA API (Google Apps Script) ──────────────────────────
+  // ── URL DA SUA API ────────────────────────────────────────────────
   const API_URL = 'https://script.google.com/macros/s/AKfycbyfPbURg4tNGMG-86EmjqUbW0-XICUOinm6W9HHfWRIxBj09qQ_5-kT_cNfQpzWqWjetg/exec';
 
-  // ── DARK MODE ────────────────────────────────────────────────────
+  // ── DARK MODE ─────────────────────────────────────────────────────
   (function(){
     const t = document.querySelector('[data-theme-toggle]');
     const r = document.documentElement;
@@ -246,7 +246,7 @@
     }
   })();
 
-  // ── ESTADO ───────────────────────────────────────────────────────
+  // ── ESTADO ────────────────────────────────────────────────────────
   let allLeads = [];
   let filtroAtivo = 'todos';
 
@@ -257,9 +257,9 @@
   }
 
   function getTemp(score) {
-    if (score <= 30) return { label: '🧊 FRIO',   cls: 'frio' };
-    if (score <= 60) return { label: '🌡️ MORNO',  cls: 'morno' };
-    return              { label: '🔥 QUENTE', cls: 'quente' };
+    if (score <= 30) return { label: '🧊 FRIO',  cls: 'frio' };
+    if (score <= 60) return { label: '🌡️ MORNO', cls: 'morno' };
+    return                  { label: '🔥 QUENTE', cls: 'quente' };
   }
 
   function getScoreColor(score) {
@@ -268,50 +268,83 @@
     return '#1e8449';
   }
 
-  // ── CARREGAR LEADS DA API ────────────────────────────────────────
-  async function carregarLeads() {
+  // ── DETECTA A CHAVE CERTA ─────────────────────────────────────────
+  // Procura em ordem: variações comuns do nome do campo
+  function acharChave(obj, variantes) {
+    for (const v of variantes) {
+      const chave = Object.keys(obj).find(k =>
+        k.trim().toLowerCase() === v.trim().toLowerCase()
+      );
+      if (chave !== undefined && obj[chave] !== undefined && obj[chave] !== '') {
+        return String(obj[chave]);
+      }
+    }
+    return '';
+  }
+
+  // ── CARREGAR VIA JSONP (resolve CORS) ────────────────────────────
+  function carregarLeads() {
     setStatus('loading', 'Buscando leads no Google Sheets...');
     document.getElementById('refresh-icon').textContent = '⏳';
 
-    try {
-      const res = await fetch(API_URL);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const dados = await res.json();
+    // Remove injeção anterior
+    const old = document.getElementById('_jsonp');
+    if (old) old.remove();
+    if (window.__cb) delete window.__cb;
+
+    // Timeout de 10s
+    const timer = setTimeout(() => {
+      setStatus('error', '❌ Tempo esgotado. Verifique se o Web App permite acesso a "Qualquer pessoa".');
+      document.getElementById('refresh-icon').textContent = '🔄';
+    }, 10000);
+
+    window.__cb = function(dados) {
+      clearTimeout(timer);
+      document.getElementById('refresh-icon').textContent = '🔄';
+
+      // DEBUG — mostra as chaves da 1ª linha no console para diagnóstico
+      if (dados.length > 0) {
+        console.log('📋 Chaves recebidas da API:', Object.keys(dados[0]));
+      }
 
       allLeads = dados
         .filter(d => {
-          // Filtra linhas vazias e o cabeçalho duplicado
-          const nome = d['Seu nome'] || d['Nome'] || d['nome'] || '';
-          return nome && nome.toString().trim() !== '';
+          const nome = acharChave(d, ['nome','seu nome','name','full name']);
+          return nome.trim() !== '';
         })
         .map(d => {
-          const score = parseInt(d['Score (0-100)'] || d['Score'] || 0) || 0;
+          const scoreRaw = acharChave(d, ['score (0-100)','score','pontuação','nota']);
+          const score = parseInt(scoreRaw) || 0;
           return {
-            nome:     d['Seu nome']     || d['Nome']     || d['nome']     || '—',
-            email:    d['Seu e-mail']   || d['E-mail']   || d['email']    || '—',
-            telefone: d['Seu telefone'] || d['Telefone'] || d['telefone'] || '',
-            mensagem: d['Sua mensagem'] || d['Mensagem'] || d['mensagem'] || '',
+            nome:     acharChave(d, ['nome','seu nome','name'])           || '—',
+            email:    acharChave(d, ['e-mail','email','seu e-mail','mail']) || '—',
+            telefone: acharChave(d, ['telefone','seu telefone','phone','celular','tel']) || '',
+            mensagem: acharChave(d, ['mensagem','sua mensagem','message','msg','recado']) || '',
             score:    score
           };
         });
 
       const agora = new Date().toLocaleTimeString('pt-BR');
       setStatus('ok', `✅ ${allLeads.length} leads carregados — última atualização: ${agora}`);
-      document.getElementById('refresh-icon').textContent = '🔄';
       renderLeads();
+    };
 
-    } catch(err) {
-      setStatus('error', '❌ Erro ao conectar: ' + err.message + ' — Verifique se a implantação está como "Qualquer pessoa"');
+    // Injeta script JSONP
+    const s = document.createElement('script');
+    s.id  = '_jsonp';
+    s.src = API_URL + '?callback=__cb&t=' + Date.now(); // t= evita cache
+    s.onerror = () => {
+      clearTimeout(timer);
+      setStatus('error', '❌ Falha ao conectar. Verifique a URL da API.');
       document.getElementById('refresh-icon').textContent = '🔄';
-      document.getElementById('empty-state').style.display = 'block';
-      document.getElementById('empty-msg').textContent = 'Não foi possível carregar os leads. Verifique a URL da API.';
-    }
+    };
+    document.body.appendChild(s);
   }
 
-  // ── RENDERIZAR TABELA ────────────────────────────────────────────
+  // ── RENDERIZAR TABELA ─────────────────────────────────────────────
   function renderLeads() {
-    const tbody  = document.getElementById('leads-table');
-    const empty  = document.getElementById('empty-state');
+    const tbody    = document.getElementById('leads-table');
+    const empty    = document.getElementById('empty-state');
     const filtered = filtroAtivo === 'todos'
       ? allLeads
       : allLeads.filter(l => getTemp(l.score).cls === filtroAtivo);
@@ -319,20 +352,24 @@
     if (filtered.length === 0) {
       tbody.innerHTML = '';
       empty.style.display = 'block';
-      document.getElementById('empty-msg').textContent = 'Nenhum lead encontrado para este filtro.';
+      document.getElementById('empty-msg').textContent =
+        allLeads.length === 0
+          ? 'Nenhum lead encontrado. Verifique se a planilha tem dados.'
+          : 'Nenhum lead encontrado para este filtro.';
       updateKPIs();
       return;
     }
-    empty.style.display = 'none';
 
+    empty.style.display = 'none';
     tbody.innerHTML = filtered.map(l => {
       const temp = getTemp(l.score);
       const cor  = getScoreColor(l.score);
+      const msgEsc = l.mensagem.replace(/"/g, '&quot;');
       return `<tr>
         <td class="td-name">${l.nome}</td>
         <td class="td-email">${l.email}</td>
         <td class="td-phone">${l.telefone || '<em style="color:var(--color-text-faint)">—</em>'}</td>
-        <td class="td-msg" title="${l.mensagem}">${l.mensagem || '<em style="color:var(--color-text-faint)">sem mensagem</em>'}</td>
+        <td class="td-msg" title="${msgEsc}">${l.mensagem || '<em style="color:var(--color-text-faint)">sem mensagem</em>'}</td>
         <td>
           <div class="score-cell">
             <div class="score-bar-wrap">
@@ -348,13 +385,13 @@
     updateKPIs();
   }
 
-  // ── KPIs ─────────────────────────────────────────────────────────
+  // ── KPIs ──────────────────────────────────────────────────────────
   function updateKPIs() {
     const total  = allLeads.length;
     const quente = allLeads.filter(l => l.score > 60).length;
     const morno  = allLeads.filter(l => l.score > 30 && l.score <= 60).length;
     const frio   = allLeads.filter(l => l.score <= 30).length;
-    const avg    = total > 0 ? Math.round(allLeads.reduce((s,l) => s+l.score, 0) / total) : 0;
+    const avg    = total > 0 ? Math.round(allLeads.reduce((s,l)=>s+l.score,0)/total) : 0;
     document.getElementById('kpi-total').textContent  = total;
     document.getElementById('kpi-quente').textContent = quente;
     document.getElementById('kpi-morno').textContent  = morno;
@@ -372,8 +409,6 @@
 
   // ── INICIALIZA ────────────────────────────────────────────────────
   carregarLeads();
-
-  // Auto-atualiza a cada 60 segundos
   setInterval(carregarLeads, 60000);
 </script>
 </body>
