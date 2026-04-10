@@ -57,13 +57,11 @@
 
     main { max-width: 1160px; margin: 0 auto; padding: clamp(20px,3vw,40px) clamp(16px,3vw,40px); }
 
-    /* STATUS BAR */
     .status-bar {
       display: flex; align-items: center; gap: 10px;
       padding: 10px 16px; border-radius: var(--radius-md);
       font-size: 13px; margin-bottom: 24px;
-      border: 1px solid var(--color-border);
-      background: var(--color-surface);
+      border: 1px solid var(--color-border); background: var(--color-surface);
     }
     .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; flex-shrink: 0; }
     .status-dot.ok      { background: #1e8449; box-shadow: 0 0 0 3px rgba(30,132,73,0.2); }
@@ -71,7 +69,15 @@
     .status-dot.error   { background: #c0392b; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-    /* KPIs */
+    /* DEBUG BOX */
+    .debug-box {
+      background: #1c2a48; color: #a8d8ea; font-family: monospace; font-size: 12px;
+      padding: 12px 16px; border-radius: var(--radius-md); margin-bottom: 20px;
+      border: 1px solid #2e4d7a; display: none;
+    }
+    .debug-box.visible { display: block; }
+    .debug-title { color: #f0c040; font-weight: bold; margin-bottom: 6px; }
+
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 16px; margin-bottom: 28px; }
     .kpi-card {
       background: var(--color-surface); border: 1px solid var(--color-border);
@@ -86,7 +92,6 @@
     .kpi-value.quente { color: var(--color-quente); }
     .kpi-value.total  { color: var(--color-text); }
 
-    /* SCORE LEGEND */
     .legend-bar {
       background: var(--color-surface); border: 1px solid var(--color-border);
       border-radius: var(--radius-lg); padding: 20px 24px; margin-bottom: 28px;
@@ -99,7 +104,6 @@
     .seg-quente { flex: 40; background: linear-gradient(90deg,#4caf72,#1e8449); }
     .legend-labels { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--color-text-muted); }
 
-    /* TABLE */
     .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
     .section-title  { font-family: var(--font-display); font-size: 22px; }
     .filter-group   { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -131,11 +135,9 @@
     .badge-morno  { background: var(--color-morno-bg);  color: var(--color-morno);  border: 1px solid var(--color-morno-border); }
     .badge-quente { background: var(--color-quente-bg); color: var(--color-quente); border: 1px solid var(--color-quente-border); }
 
-    /* SKELETON */
     @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
     .skeleton { background: linear-gradient(90deg,var(--color-divider) 25%,var(--color-border) 50%,var(--color-divider) 75%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:var(--radius-sm); }
 
-    /* EMPTY */
     .empty { text-align: center; padding: 56px 24px; color: var(--color-text-muted); }
     .empty-icon { font-size: 40px; margin-bottom: 12px; }
 
@@ -169,13 +171,18 @@
 
 <main>
 
-  <!-- Status da conexão -->
   <div class="status-bar">
     <div class="status-dot loading" id="status-dot"></div>
     <span id="status-msg">Conectando ao Google Sheets...</span>
   </div>
 
-  <!-- KPIs -->
+  <!-- Caixa de debug — aparece automaticamente se dados chegarem mas campos ficarem vazios -->
+  <div class="debug-box" id="debug-box">
+    <div class="debug-title">🔍 Diagnóstico — Chaves recebidas da API:</div>
+    <div id="debug-keys"></div>
+    <div id="debug-sample" style="margin-top:8px;color:#ccc;font-size:11px;"></div>
+  </div>
+
   <div class="kpi-grid">
     <div class="kpi-card"><div class="kpi-label">Total de Leads</div><div class="kpi-value total" id="kpi-total">—</div></div>
     <div class="kpi-card"><div class="kpi-label">🔥 Quentes</div><div class="kpi-value quente" id="kpi-quente">—</div></div>
@@ -184,7 +191,6 @@
     <div class="kpi-card"><div class="kpi-label">Score Médio</div><div class="kpi-value total" id="kpi-avg">—</div></div>
   </div>
 
-  <!-- Barra de temperatura -->
   <div class="legend-bar">
     <div class="legend-title">Escala de Temperatura dos Leads</div>
     <div class="score-track">
@@ -199,7 +205,6 @@
     </div>
   </div>
 
-  <!-- Tabela -->
   <div>
     <div class="section-header">
       <span class="section-title">Leads Capturados</span>
@@ -215,8 +220,8 @@
         <thead>
           <tr>
             <th>Nome</th><th>E-mail</th>
-            <th class="hide-mobile">Telefone</th>
-            <th class="hide-mobile">Mensagem</th>
+            <th>Telefone</th>
+            <th>Mensagem</th>
             <th>Score</th><th>Temperatura</th>
           </tr>
         </thead>
@@ -232,34 +237,44 @@
 </main>
 
 <script>
-  // ── URL DA SUA API ────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  //  ⚙️  CONFIGURAÇÃO — só mexa aqui se necessário
+  // ════════════════════════════════════════════════════════════
   const API_URL = 'https://script.google.com/macros/s/AKfycbyfPbURg4tNGMG-86EmjqUbW0-XICUOinm6W9HHfWRIxBj09qQ_5-kT_cNfQpzWqWjetg/exec';
 
-  // ── DARK MODE ─────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  //  DARK MODE
+  // ════════════════════════════════════════════════════════════
   (function(){
     const t = document.querySelector('[data-theme-toggle]');
     const r = document.documentElement;
     let d = matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
     r.setAttribute('data-theme', d);
-    if(t){ t.textContent = d==='dark'?'☀️':'🌙';
-      t.addEventListener('click',()=>{ d=d==='dark'?'light':'dark'; r.setAttribute('data-theme',d); t.textContent=d==='dark'?'☀️':'🌙'; });
+    if (t) {
+      t.textContent = d === 'dark' ? '☀️' : '🌙';
+      t.addEventListener('click', () => {
+        d = d === 'dark' ? 'light' : 'dark';
+        r.setAttribute('data-theme', d);
+        t.textContent = d === 'dark' ? '☀️' : '🌙';
+      });
     }
   })();
 
-  // ── ESTADO ────────────────────────────────────────────────────────
-  let allLeads = [];
+  // ════════════════════════════════════════════════════════════
+  //  ESTADO
+  // ════════════════════════════════════════════════════════════
+  let allLeads   = [];
   let filtroAtivo = 'todos';
 
   function setStatus(tipo, msg) {
-    const dot = document.getElementById('status-dot');
-    dot.className = 'status-dot ' + tipo;
+    document.getElementById('status-dot').className = 'status-dot ' + tipo;
     document.getElementById('status-msg').textContent = msg;
   }
 
   function getTemp(score) {
-    if (score <= 30) return { label: '🧊 FRIO',  cls: 'frio' };
-    if (score <= 60) return { label: '🌡️ MORNO', cls: 'morno' };
-    return                  { label: '🔥 QUENTE', cls: 'quente' };
+    if (score <= 30) return { label: '🧊 FRIO',   cls: 'frio'   };
+    if (score <= 60) return { label: '🌡️ MORNO',  cls: 'morno'  };
+    return                  { label: '🔥 QUENTE',  cls: 'quente' };
   }
 
   function getScoreColor(score) {
@@ -268,80 +283,119 @@
     return '#1e8449';
   }
 
-  // ── DETECTA A CHAVE CERTA ─────────────────────────────────────────
-  // Procura em ordem: variações comuns do nome do campo
-  function acharChave(obj, variantes) {
-    for (const v of variantes) {
-      const chave = Object.keys(obj).find(k =>
-        k.trim().toLowerCase() === v.trim().toLowerCase()
-      );
-      if (chave !== undefined && obj[chave] !== undefined && obj[chave] !== '') {
-        return String(obj[chave]);
+  // ════════════════════════════════════════════════════════════
+  //  BUSCA INTELIGENTE DE CAMPOS
+  //  Normaliza acentos e espaços para comparar sem depender
+  //  do nome exato que o Google Forms gerou
+  // ════════════════════════════════════════════════════════════
+  function normalizar(str) {
+    return String(str)
+      .toLowerCase()
+      .normalize('NFD')                      // separa letra + acento
+      .replace(/[\u0300-\u036f]/g, '')       // remove os acentos
+      .replace(/[^a-z0-9]/g, '');            // só letras e números
+  }
+
+  function acharCampo(obj, termos) {
+    // Tenta correspondência exata normalizada
+    const chaves = Object.keys(obj);
+    for (const termo of termos) {
+      const t = normalizar(termo);
+      const chave = chaves.find(k => normalizar(k) === t);
+      if (chave !== undefined && obj[chave] !== undefined && String(obj[chave]).trim() !== '') {
+        return String(obj[chave]).trim();
+      }
+    }
+    // Fallback: contém o termo (para labels longas como "Seu nome completo")
+    for (const termo of termos) {
+      const t = normalizar(termo);
+      const chave = chaves.find(k => normalizar(k).includes(t));
+      if (chave !== undefined && obj[chave] !== undefined && String(obj[chave]).trim() !== '') {
+        return String(obj[chave]).trim();
       }
     }
     return '';
   }
 
-  // ── CARREGAR VIA JSONP (resolve CORS) ────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  //  CARREGAR VIA JSONP
+  // ════════════════════════════════════════════════════════════
   function carregarLeads() {
     setStatus('loading', 'Buscando leads no Google Sheets...');
     document.getElementById('refresh-icon').textContent = '⏳';
 
-    // Remove injeção anterior
-    const old = document.getElementById('_jsonp');
+    // Limpa injeção anterior
+    const old = document.getElementById('_jsonp_script');
     if (old) old.remove();
-    if (window.__cb) delete window.__cb;
+    if (window._jsonpHandler) delete window._jsonpHandler;
 
-    // Timeout de 10s
+    // Timeout de segurança
     const timer = setTimeout(() => {
-      setStatus('error', '❌ Tempo esgotado. Verifique se o Web App permite acesso a "Qualquer pessoa".');
+      setStatus('error', '❌ Tempo esgotado (10s). Confirme que o Web App está publicado para "Qualquer pessoa".');
       document.getElementById('refresh-icon').textContent = '🔄';
     }, 10000);
 
-    window.__cb = function(dados) {
+    // Callback que o Apps Script vai invocar
+    window._jsonpHandler = function(dados) {
       clearTimeout(timer);
       document.getElementById('refresh-icon').textContent = '🔄';
 
-      // DEBUG — mostra as chaves da 1ª linha no console para diagnóstico
-      if (dados.length > 0) {
-        console.log('📋 Chaves recebidas da API:', Object.keys(dados[0]));
+      // ── DIAGNÓSTICO AUTOMÁTICO ────────────────────────────
+      if (dados && dados.length > 0) {
+        const chaves = Object.keys(dados[0]);
+        console.log('📋 Chaves da API:', chaves);
+        console.log('🔎 Primeira linha:', dados[0]);
+
+        // Mostra debug na tela se algum campo crítico ficar vazio
+        const testNome = acharCampo(dados[0], ['nome','seu nome','name']);
+        if (!testNome) {
+          const box = document.getElementById('debug-box');
+          box.classList.add('visible');
+          document.getElementById('debug-keys').textContent = JSON.stringify(chaves, null, 2);
+          document.getElementById('debug-sample').textContent =
+            'Primeira linha recebida: ' + JSON.stringify(dados[0]);
+        }
       }
 
-      allLeads = dados
+      // ── MAPEAR LEADS ──────────────────────────────────────
+      allLeads = (dados || [])
         .filter(d => {
-          const nome = acharChave(d, ['nome','seu nome','name','full name']);
-          return nome.trim() !== '';
+          // Ignora linhas sem nome (linhas vazias ou cabeçalho repetido)
+          const nome = acharCampo(d, ['nome','seu nome','name','full name','nome completo']);
+          return nome !== '' && nome.toLowerCase() !== 'nome'; // exclui cabeçalho
         })
         .map(d => {
-          const scoreRaw = acharChave(d, ['score (0-100)','score','pontuação','nota']);
-          const score = parseInt(scoreRaw) || 0;
+          const scoreRaw = acharCampo(d, ['score','score 0100','pontuacao','nota']);
+          const score    = Math.min(100, Math.max(0, parseInt(scoreRaw) || 0));
           return {
-            nome:     acharChave(d, ['nome','seu nome','name'])           || '—',
-            email:    acharChave(d, ['e-mail','email','seu e-mail','mail']) || '—',
-            telefone: acharChave(d, ['telefone','seu telefone','phone','celular','tel']) || '',
-            mensagem: acharChave(d, ['mensagem','sua mensagem','message','msg','recado']) || '',
-            score:    score
+            nome:     acharCampo(d, ['nome','seu nome','name','nome completo'])             || '—',
+            email:    acharCampo(d, ['email','e-mail','seu email','seuemail','mail'])        || '—',
+            telefone: acharCampo(d, ['telefone','seu telefone','celular','tel','phone','fone']) || '',
+            mensagem: acharCampo(d, ['mensagem','sua mensagem','message','msg','recado','texto']) || '',
+            score
           };
         });
 
       const agora = new Date().toLocaleTimeString('pt-BR');
-      setStatus('ok', `✅ ${allLeads.length} leads carregados — última atualização: ${agora}`);
+      setStatus('ok', `✅ ${allLeads.length} lead(s) carregado(s) — atualizado às ${agora}`);
       renderLeads();
     };
 
-    // Injeta script JSONP
-    const s = document.createElement('script');
-    s.id  = '_jsonp';
-    s.src = API_URL + '?callback=__cb&t=' + Date.now(); // t= evita cache
+    // Injeta o <script> JSONP com cache-buster
+    const s  = document.createElement('script');
+    s.id     = '_jsonp_script';
+    s.src    = API_URL + '?callback=_jsonpHandler&_=' + Date.now();
     s.onerror = () => {
       clearTimeout(timer);
-      setStatus('error', '❌ Falha ao conectar. Verifique a URL da API.');
+      setStatus('error', '❌ Não foi possível conectar. Verifique a URL da API.');
       document.getElementById('refresh-icon').textContent = '🔄';
     };
     document.body.appendChild(s);
   }
 
-  // ── RENDERIZAR TABELA ─────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  //  RENDERIZAR TABELA
+  // ════════════════════════════════════════════════════════════
   function renderLeads() {
     const tbody    = document.getElementById('leads-table');
     const empty    = document.getElementById('empty-state');
@@ -352,24 +406,26 @@
     if (filtered.length === 0) {
       tbody.innerHTML = '';
       empty.style.display = 'block';
-      document.getElementById('empty-msg').textContent =
-        allLeads.length === 0
-          ? 'Nenhum lead encontrado. Verifique se a planilha tem dados.'
-          : 'Nenhum lead encontrado para este filtro.';
+      document.getElementById('empty-msg').textContent = allLeads.length === 0
+        ? 'Nenhum lead encontrado. Verifique se a planilha tem dados.'
+        : 'Nenhum lead para este filtro.';
       updateKPIs();
       return;
     }
 
     empty.style.display = 'none';
     tbody.innerHTML = filtered.map(l => {
-      const temp = getTemp(l.score);
-      const cor  = getScoreColor(l.score);
-      const msgEsc = l.mensagem.replace(/"/g, '&quot;');
+      const temp   = getTemp(l.score);
+      const cor    = getScoreColor(l.score);
+      const msgSafe = l.mensagem.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+      const nomeSafe = l.nome.replace(/</g,'&lt;');
+      const emailSafe = l.email.replace(/</g,'&lt;');
+      const telSafe  = l.telefone.replace(/</g,'&lt;');
       return `<tr>
-        <td class="td-name">${l.nome}</td>
-        <td class="td-email">${l.email}</td>
-        <td class="td-phone">${l.telefone || '<em style="color:var(--color-text-faint)">—</em>'}</td>
-        <td class="td-msg" title="${msgEsc}">${l.mensagem || '<em style="color:var(--color-text-faint)">sem mensagem</em>'}</td>
+        <td class="td-name">${nomeSafe}</td>
+        <td class="td-email">${emailSafe}</td>
+        <td class="td-phone">${telSafe || '<em style="color:var(--color-text-faint)">—</em>'}</td>
+        <td class="td-msg" title="${msgSafe}">${msgSafe || '<em style="color:var(--color-text-faint)">sem mensagem</em>'}</td>
         <td>
           <div class="score-cell">
             <div class="score-bar-wrap">
@@ -385,13 +441,15 @@
     updateKPIs();
   }
 
-  // ── KPIs ──────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  //  KPIs
+  // ════════════════════════════════════════════════════════════
   function updateKPIs() {
     const total  = allLeads.length;
     const quente = allLeads.filter(l => l.score > 60).length;
     const morno  = allLeads.filter(l => l.score > 30 && l.score <= 60).length;
     const frio   = allLeads.filter(l => l.score <= 30).length;
-    const avg    = total > 0 ? Math.round(allLeads.reduce((s,l)=>s+l.score,0)/total) : 0;
+    const avg    = total > 0 ? Math.round(allLeads.reduce((s, l) => s + l.score, 0) / total) : 0;
     document.getElementById('kpi-total').textContent  = total;
     document.getElementById('kpi-quente').textContent = quente;
     document.getElementById('kpi-morno').textContent  = morno;
@@ -399,7 +457,9 @@
     document.getElementById('kpi-avg').textContent    = avg;
   }
 
-  // ── FILTROS ───────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  //  FILTROS
+  // ════════════════════════════════════════════════════════════
   function filtrar(btn, tipo) {
     filtroAtivo = tipo;
     document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -407,7 +467,9 @@
     renderLeads();
   }
 
-  // ── INICIALIZA ────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════
+  //  INICIALIZA
+  // ════════════════════════════════════════════════════════════
   carregarLeads();
   setInterval(carregarLeads, 60000);
 </script>
