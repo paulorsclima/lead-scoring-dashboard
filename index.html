@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lead Scoring Dashboard — Marketing Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root, [data-theme="light"] {
+      --color-bg: #f7f6f2; --color-surface: #f9f8f5; --color-surface-2: #ffffff;
+      --color-border: #d4d1ca; --color-divider: #dcd9d5;
+      --color-text: #28251d; --color-text-muted: #7a7974; --color-text-faint: #bab9b4;
+      --color-primary: #1c2a48; --color-primary-hover: #0f1e35;
+      --color-accent: #ff7a00; --color-accent-hover: #e56a00;
+      --color-frio: #1a5276; --color-frio-bg: #cfe2ff; --color-frio-border: #93c4ef;
+      --color-morno: #7d6608; --color-morno-bg: #fff3cd; --color-morno-border: #f0d078;
+      --color-quente: #1e8449; --color-quente-bg: #d4edda; --color-quente-border: #82d9a1;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.08); --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
+      --radius-sm: 6px; --radius-md: 10px; --radius-lg: 16px;
+      --font-body: 'Inter', sans-serif; --font-display: 'Instrument Serif', serif;
+      --transition: 200ms cubic-bezier(0.16,1,0.3,1);
+    }
+    [data-theme="dark"] {
+      --color-bg: #171614; --color-surface: #1c1b19; --color-surface-2: #22211f;
+      --color-border: #393836; --color-divider: #2b2a28;
+      --color-text: #cdccca; --color-text-muted: #797876; --color-text-faint: #5a5957;
+      --color-primary: #4a6fa5; --color-accent: #ff9a40;
+      --color-frio: #7ec4ef; --color-frio-bg: #1a2d40; --color-frio-border: #2e4d66;
+      --color-morno: #f0c040; --color-morno-bg: #2e2508; --color-morno-border: #5a4200;
+      --color-quente: #6dcc85; --color-quente-bg: #0c2e18; --color-quente-border: #1e5530;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.3); --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+    body { font-family: var(--font-body); font-size: 15px; background: var(--color-bg); color: var(--color-text); min-height: 100vh; }
+
+    header {
+      background: var(--color-primary); color: white;
+      padding: 0 clamp(16px,4vw,48px); height: 64px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-md);
+    }
+    .logo-area { display: flex; align-items: center; gap: 12px; }
+    .logo-text  { font-family: var(--font-display); font-size: 22px; color: white; }
+    .logo-badge { font-size: 11px; background: var(--color-accent); color: white; padding: 2px 8px; border-radius: 20px; font-weight: 600; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .btn-refresh {
+      background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+      color: white; padding: 6px 14px; border-radius: var(--radius-sm);
+      cursor: pointer; font-size: 13px; font-weight: 600; transition: background var(--transition);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-refresh:hover { background: rgba(255,255,255,0.22); }
+    .btn-toggle { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 10px; border-radius: var(--radius-sm); cursor: pointer; font-size: 14px; }
+
+    main { max-width: 1160px; margin: 0 auto; padding: clamp(20px,3vw,40px) clamp(16px,3vw,40px); }
+
+    /* STATUS BAR */
+    .status-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-radius: var(--radius-md);
+      font-size: 13px; margin-bottom: 24px;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+    }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; flex-shrink: 0; }
+    .status-dot.ok      { background: #1e8449; box-shadow: 0 0 0 3px rgba(30,132,73,0.2); }
+    .status-dot.loading { background: #f0c040; animation: pulse 1s infinite; }
+    .status-dot.error   { background: #c0392b; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    /* KPIs */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 16px; margin-bottom: 28px; }
+    .kpi-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: 20px 24px;
+      box-shadow: var(--shadow-sm); transition: box-shadow var(--transition), transform var(--transition);
+    }
+    .kpi-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .kpi-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-text-muted); margin-bottom: 8px; }
+    .kpi-value { font-size: 32px; font-weight: 700; line-height: 1; }
+    .kpi-value.frio   { color: var(--color-frio); }
+    .kpi-value.morno  { color: var(--color-morno); }
+    .kpi-value.quente { color: var(--color-quente); }
+    .kpi-value.total  { color: var(--color-text); }
+
+    /* SCORE LEGEND */
+    .legend-bar {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: 20px 24px; margin-bottom: 28px;
+    }
+    .legend-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; color: var(--color-text-muted); margin-bottom: 12px; }
+    .score-track { display: flex; height: 26px; border-radius: 20px; overflow: hidden; gap: 3px; }
+    .score-segment { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: white; letter-spacing: 0.4px; }
+    .seg-frio   { flex: 30; background: linear-gradient(90deg,#4a9edd,#2e7cbf); }
+    .seg-morno  { flex: 30; background: linear-gradient(90deg,#f7c948,#e8a00a); }
+    .seg-quente { flex: 40; background: linear-gradient(90deg,#4caf72,#1e8449); }
+    .legend-labels { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--color-text-muted); }
+
+    /* TABLE */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .section-title  { font-family: var(--font-display); font-size: 22px; }
+    .filter-group   { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-btn {
+      border: 1px solid var(--color-border); background: var(--color-surface);
+      color: var(--color-text-muted); padding: 6px 14px; border-radius: 20px;
+      cursor: pointer; font-size: 13px; font-weight: 500; transition: all var(--transition);
+    }
+    .filter-btn:hover, .filter-btn.active { border-color: var(--color-accent); color: var(--color-accent); background: color-mix(in oklch,var(--color-accent) 8%,var(--color-surface)); font-weight: 700; }
+
+    .table-wrap { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm); }
+    table { width: 100%; border-collapse: collapse; }
+    thead { background: var(--color-primary); color: white; }
+    thead th { padding: 13px 16px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.7px; white-space: nowrap; }
+    tbody tr { border-bottom: 1px solid var(--color-divider); transition: background var(--transition); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--color-surface-2); }
+    tbody td { padding: 13px 16px; font-size: 14px; vertical-align: middle; }
+    .td-name  { font-weight: 600; }
+    .td-email { color: var(--color-text-muted); font-size: 13px; }
+    .td-phone { font-family: monospace; font-size: 13px; color: var(--color-text-muted); }
+    .td-msg   { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--color-text-muted); font-size: 13px; }
+    .score-cell { display: flex; align-items: center; gap: 10px; }
+    .score-bar-wrap { flex: 1; background: var(--color-divider); border-radius: 20px; height: 8px; overflow: hidden; min-width: 60px; }
+    .score-bar-fill { height: 100%; border-radius: 20px; }
+    .score-num { font-weight: 700; font-size: 15px; min-width: 32px; text-align: right; }
+    .temp-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .badge-frio   { background: var(--color-frio-bg);   color: var(--color-frio);   border: 1px solid var(--color-frio-border); }
+    .badge-morno  { background: var(--color-morno-bg);  color: var(--color-morno);  border: 1px solid var(--color-morno-border); }
+    .badge-quente { background: var(--color-quente-bg); color: var(--color-quente); border: 1px solid var(--color-quente-border); }
+
+    /* SKELETON */
+    @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+    .skeleton { background: linear-gradient(90deg,var(--color-divider) 25%,var(--color-border) 50%,var(--color-divider) 75%); background-size:200% 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:var(--radius-sm); }
+
+    /* EMPTY */
+    .empty { text-align: center; padding: 56px 24px; color: var(--color-text-muted); }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+    @media (max-width: 768px) {
+      .td-msg, .td-phone { display: none; }
+      .score-bar-wrap { display: none; }
+      .kpi-grid { grid-template-columns: repeat(2,1fr); }
+      .section-header { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-area">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-label="Marketing Pro">
+      <rect width="36" height="36" rx="10" fill="#ff7a00"/>
+      <path d="M8 26V10l10 8 10-8v16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="18" cy="21" r="3" fill="white"/>
+    </svg>
+    <span class="logo-text">Marketing Pro</span>
+    <span class="logo-badge">LEADS AO VIVO</span>
+  </div>
+  <div class="header-right">
+    <button class="btn-refresh" onclick="carregarLeads()">
+      <span id="refresh-icon">🔄</span> Atualizar
+    </button>
+    <button class="btn-toggle" data-theme-toggle aria-label="Alternar tema">🌙</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- Status da conexão -->
+  <div class="status-bar">
+    <div class="status-dot loading" id="status-dot"></div>
+    <span id="status-msg">Conectando ao Google Sheets...</span>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Total de Leads</div><div class="kpi-value total" id="kpi-total">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">🔥 Quentes</div><div class="kpi-value quente" id="kpi-quente">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">🌡️ Mornos</div><div class="kpi-value morno" id="kpi-morno">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">🧊 Frios</div><div class="kpi-value frio" id="kpi-frio">—</div></div>
+    <div class="kpi-card"><div class="kpi-label">Score Médio</div><div class="kpi-value total" id="kpi-avg">—</div></div>
+  </div>
+
+  <!-- Barra de temperatura -->
+  <div class="legend-bar">
+    <div class="legend-title">Escala de Temperatura dos Leads</div>
+    <div class="score-track">
+      <div class="score-segment seg-frio">0 – 30 FRIO</div>
+      <div class="score-segment seg-morno">31 – 60 MORNO</div>
+      <div class="score-segment seg-quente">61 – 100 QUENTE</div>
+    </div>
+    <div class="legend-labels">
+      <span>Pouco engajamento</span>
+      <span>Score 50</span>
+      <span>Alta intenção de compra</span>
+    </div>
+  </div>
+
+  <!-- Tabela -->
+  <div>
+    <div class="section-header">
+      <span class="section-title">Leads Capturados</span>
+      <div class="filter-group">
+        <button class="filter-btn active" onclick="filtrar(this,'todos')">Todos</button>
+        <button class="filter-btn" onclick="filtrar(this,'quente')">🔥 Quentes</button>
+        <button class="filter-btn" onclick="filtrar(this,'morno')">🌡️ Mornos</button>
+        <button class="filter-btn" onclick="filtrar(this,'frio')">🧊 Frios</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nome</th><th>E-mail</th>
+            <th class="hide-mobile">Telefone</th>
+            <th class="hide-mobile">Mensagem</th>
+            <th>Score</th><th>Temperatura</th>
+          </tr>
+        </thead>
+        <tbody id="leads-table"></tbody>
+      </table>
+      <div class="empty" id="empty-state" style="display:none;">
+        <div class="empty-icon">📭</div>
+        <p id="empty-msg">Nenhum lead encontrado.</p>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // ── URL DA SUA API (Google Apps Script) ──────────────────────────
+  const API_URL = 'https://script.google.com/macros/s/AKfycbyq4nFrPcO2oiS55Al-JMtvmV4u0lec8nQch96ducVm/exec';
+
+  // ── DARK MODE ────────────────────────────────────────────────────
+  (function(){
+    const t = document.querySelector('[data-theme-toggle]');
+    const r = document.documentElement;
+    let d = matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
+    r.setAttribute('data-theme', d);
+    if(t){ t.textContent = d==='dark'?'☀️':'🌙';
+      t.addEventListener('click',()=>{ d=d==='dark'?'light':'dark'; r.setAttribute('data-theme',d); t.textContent=d==='dark'?'☀️':'🌙'; });
+    }
+  })();
+
+  // ── ESTADO ───────────────────────────────────────────────────────
+  let allLeads = [];
+  let filtroAtivo = 'todos';
+
+  function setStatus(tipo, msg) {
+    const dot = document.getElementById('status-dot');
+    dot.className = 'status-dot ' + tipo;
+    document.getElementById('status-msg').textContent = msg;
+  }
+
+  function getTemp(score) {
+    if (score <= 30) return { label: '🧊 FRIO',   cls: 'frio' };
+    if (score <= 60) return { label: '🌡️ MORNO',  cls: 'morno' };
+    return              { label: '🔥 QUENTE', cls: 'quente' };
+  }
+
+  function getScoreColor(score) {
+    if (score <= 30) return '#2e7cbf';
+    if (score <= 60) return '#e8a00a';
+    return '#1e8449';
+  }
+
+  // ── CARREGAR LEADS DA API ────────────────────────────────────────
+  async function carregarLeads() {
+    setStatus('loading', 'Buscando leads no Google Sheets...');
+    document.getElementById('refresh-icon').textContent = '⏳';
+
+    try {
+      const res = await fetch(API_URL);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const dados = await res.json();
+
+      allLeads = dados
+        .filter(d => {
+          // Filtra linhas vazias e o cabeçalho duplicado
+          const nome = d['Seu nome'] || d['Nome'] || d['nome'] || '';
+          return nome && nome.toString().trim() !== '';
+        })
+        .map(d => {
+          const score = parseInt(d['Score (0-100)'] || d['Score'] || 0) || 0;
+          return {
+            nome:     d['Seu nome']     || d['Nome']     || d['nome']     || '—',
+            email:    d['Seu e-mail']   || d['E-mail']   || d['email']    || '—',
+            telefone: d['Seu telefone'] || d['Telefone'] || d['telefone'] || '',
+            mensagem: d['Sua mensagem'] || d['Mensagem'] || d['mensagem'] || '',
+            score:    score
+          };
+        });
+
+      const agora = new Date().toLocaleTimeString('pt-BR');
+      setStatus('ok', `✅ ${allLeads.length} leads carregados — última atualização: ${agora}`);
+      document.getElementById('refresh-icon').textContent = '🔄';
+      renderLeads();
+
+    } catch(err) {
+      setStatus('error', '❌ Erro ao conectar: ' + err.message + ' — Verifique se a implantação está como "Qualquer pessoa"');
+      document.getElementById('refresh-icon').textContent = '🔄';
+      document.getElementById('empty-state').style.display = 'block';
+      document.getElementById('empty-msg').textContent = 'Não foi possível carregar os leads. Verifique a URL da API.';
+    }
+  }
+
+  // ── RENDERIZAR TABELA ────────────────────────────────────────────
+  function renderLeads() {
+    const tbody  = document.getElementById('leads-table');
+    const empty  = document.getElementById('empty-state');
+    const filtered = filtroAtivo === 'todos'
+      ? allLeads
+      : allLeads.filter(l => getTemp(l.score).cls === filtroAtivo);
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+      document.getElementById('empty-msg').textContent = 'Nenhum lead encontrado para este filtro.';
+      updateKPIs();
+      return;
+    }
+    empty.style.display = 'none';
+
+    tbody.innerHTML = filtered.map(l => {
+      const temp = getTemp(l.score);
+      const cor  = getScoreColor(l.score);
+      return `<tr>
+        <td class="td-name">${l.nome}</td>
+        <td class="td-email">${l.email}</td>
+        <td class="td-phone">${l.telefone || '<em style="color:var(--color-text-faint)">—</em>'}</td>
+        <td class="td-msg" title="${l.mensagem}">${l.mensagem || '<em style="color:var(--color-text-faint)">sem mensagem</em>'}</td>
+        <td>
+          <div class="score-cell">
+            <div class="score-bar-wrap">
+              <div class="score-bar-fill" style="width:${l.score}%;background:${cor}"></div>
+            </div>
+            <span class="score-num" style="color:${cor}">${l.score}</span>
+          </div>
+        </td>
+        <td><span class="temp-badge badge-${temp.cls}">${temp.label}</span></td>
+      </tr>`;
+    }).join('');
+
+    updateKPIs();
+  }
+
+  // ── KPIs ─────────────────────────────────────────────────────────
+  function updateKPIs() {
+    const total  = allLeads.length;
+    const quente = allLeads.filter(l => l.score > 60).length;
+    const morno  = allLeads.filter(l => l.score > 30 && l.score <= 60).length;
+    const frio   = allLeads.filter(l => l.score <= 30).length;
+    const avg    = total > 0 ? Math.round(allLeads.reduce((s,l) => s+l.score, 0) / total) : 0;
+    document.getElementById('kpi-total').textContent  = total;
+    document.getElementById('kpi-quente').textContent = quente;
+    document.getElementById('kpi-morno').textContent  = morno;
+    document.getElementById('kpi-frio').textContent   = frio;
+    document.getElementById('kpi-avg').textContent    = avg;
+  }
+
+  // ── FILTROS ───────────────────────────────────────────────────────
+  function filtrar(btn, tipo) {
+    filtroAtivo = tipo;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderLeads();
+  }
+
+  // ── INICIALIZA ────────────────────────────────────────────────────
+  carregarLeads();
+
+  // Auto-atualiza a cada 60 segundos
+  setInterval(carregarLeads, 60000);
+</script>
+</body>
+</html>
